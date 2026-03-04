@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Spring Training 2026 - Expense Splitter</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -357,7 +357,8 @@ let subscription = null;
 
 // --- Supabase ---
 async function connectSupabase(url, key) {
-  supabase = window.supabase.createClient(url, key);
+  const { createClient } = window.supabase;
+  supabase = createClient(url, key);
 
   // Test connection
   const { error } = await supabase.from('expenses').select('id').limit(1);
