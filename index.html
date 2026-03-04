@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spring Training 2026 - Expense Splitter</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #27251F;
+    color: #EFD19F;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  h1 {
+    text-align: center;
+    color: #FD5A1E;
+    font-size: 1.8rem;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #c4a46a;
+    font-size: 0.9rem;
+    margin-bottom: 24px;
+  }
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  .card {
+    background: #332F27;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #4a4332;
+  }
+  .card h2 {
+    font-size: 1.1rem;
+    color: #FD5A1E;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .form-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: end;
+  }
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .form-group label {
+    font-size: 0.75rem;
+    color: #c4a46a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .form-group input, .form-group select {
+    padding: 8px 12px;
+    border: 1px solid #4a4332;
+    border-radius: 6px;
+    background: #1e1c17;
+    color: #EFD19F;
+    font-size: 0.95rem;
+  }
+  .form-group input:focus, .form-group select:focus {
+    outline: none;
+    border-color: #FD5A1E;
+  }
+  .form-group.desc { flex: 2; min-width: 150px; }
+  .form-group.amount { flex: 0.7; min-width: 90px; }
+  .form-group.payer { flex: 0.8; min-width: 100px; }
+  .form-group.date { flex: 0.8; min-width: 120px; }
+  .btn {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  .btn-add {
+    background: #FD5A1E;
+    color: #27251F;
+  }
+  .btn-add:hover { background: #ff7a45; }
+  .btn-delete {
+    background: transparent;
+    color: #ff6b6b;
+    font-size: 1.2rem;
+    padding: 4px 8px;
+    border: none;
+    cursor: pointer;
+    opacity: 0.6;
+  }
+  .btn-delete:hover { opacity: 1; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th {
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 0.75rem;
+    color: #c4a46a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #4a4332;
+  }
+  td {
+    padding: 10px;
+    border-bottom: 1px solid #3a3729;
+    font-size: 0.95rem;
+  }
+  tr:hover td { background: #3a3729; }
+  .amount-cell { font-family: 'SF Mono', Monaco, monospace; }
+  .total-row td {
+    font-weight: 700;
+    border-top: 2px solid #FD5A1E;
+    border-bottom: none;
+    color: #FD5A1E;
+  }
+  .settlement-card {
+    background: #2a2517;
+    border: 1px solid #5a4a2a;
+  }
+  .settlement-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: #3a3320;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    font-size: 1.05rem;
+  }
+  .settlement-item .arrow {
+    color: #FD5A1E;
+    margin: 0 12px;
+    font-weight: bold;
+  }
+  .settlement-item .amount {
+    margin-left: auto;
+    font-weight: 700;
+    color: #FD5A1E;
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 1.1rem;
+  }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .summary-person {
+    background: #1e1c17;
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+  }
+  .summary-person .name {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 6px;
+    color: #EFD19F;
+  }
+  .summary-person .paid {
+    color: #c4a46a;
+    font-size: 0.8rem;
+    margin-bottom: 2px;
+  }
+  .summary-person .owed {
+    color: #c4a46a;
+    font-size: 0.8rem;
+  }
+  .summary-person .balance {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-top: 6px;
+    font-family: 'SF Mono', Monaco, monospace;
+  }
+  .positive { color: #FD5A1E; }
+  .negative { color: #ff6b6b; }
+  .zero { color: #c4a46a; }
+  .no-expenses {
+    text-align: center;
+    color: #7a6f55;
+    padding: 30px;
+    font-style: italic;
+  }
+  .checkbox-group {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding-top: 4px;
+  }
+  .checkbox-group label {
+    font-size: 0.9rem;
+    color: #EFD19F;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+  .checkbox-group input[type="checkbox"] {
+    accent-color: #FD5A1E;
+  }
+  .split-label {
+    font-size: 0.75rem;
+    color: #c4a46a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .split-tags {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .split-tag {
+    font-size: 0.75rem;
+    background: #4a3a1e;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #FD5A1E;
+  }
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #FD5A1E;
+    color: #27251F;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 1000;
+    pointer-events: none;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .status-dot.connected { background: #4ade80; }
+  .status-dot.disconnected { background: #ff6b6b; }
+  .status-bar {
+    text-align: center;
+    font-size: 0.8rem;
+    color: #7a6f55;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  @media (max-width: 600px) {
+    .form-row { flex-direction: column; }
+    .summary-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- MAIN APP -->
+<div id="app" class="container">
+  <h1>Spring Training 2026</h1>
+  <p class="subtitle">Phoenix Trip Expense Splitter &mdash; Vince, Jim & Dave</p>
+  <div class="status-bar">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="status-text">Connecting...</span>
+  </div>
+
+  <!-- Add Expense Form -->
+  <div class="card">
+    <h2>Add Expense</h2>
+    <div class="form-row">
+      <div class="form-group desc">
+        <label>Description</label>
+        <input type="text" id="desc" placeholder="e.g. Game tickets, Dinner">
+      </div>
+      <div class="form-group amount">
+        <label>Amount ($)</label>
+        <input type="number" id="amount" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="form-group payer">
+        <label>Paid By</label>
+        <select id="payer">
+          <option value="Vince">Vince</option>
+          <option value="Jim">Jim</option>
+          <option value="Dave">Dave</option>
+        </select>
+      </div>
+      <div class="form-group date">
+        <label>Date</label>
+        <input type="date" id="date">
+      </div>
+    </div>
+    <div style="margin-top: 12px;">
+      <div class="split-label">Split Among</div>
+      <div class="checkbox-group">
+        <label><input type="checkbox" id="split-Vince" checked> Vince</label>
+        <label><input type="checkbox" id="split-Jim" checked> Jim</label>
+        <label><input type="checkbox" id="split-Dave" checked> Dave</label>
+      </div>
+    </div>
+    <div style="margin-top: 14px;">
+      <button class="btn btn-add" onclick="addExpense()">Add Expense</button>
+    </div>
+  </div>
+
+  <!-- Expense List -->
+  <div class="card">
+    <h2>Expenses</h2>
+    <div id="expense-list"></div>
+  </div>
+
+  <!-- Summary -->
+  <div class="card">
+    <h2>Summary</h2>
+    <div id="summary"></div>
+  </div>
+
+  <!-- Settlement -->
+  <div class="card settlement-card">
+    <h2>Who Owes Whom</h2>
+    <div id="settlement"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const PEOPLE = ['Vince', 'Jim', 'Dave'];
+const SUPABASE_URL = 'https://btfwvsfbmiyezenzwnpa.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0Znd2c2ZibWl5ZXplbnp3bnBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5NDYzMzIsImV4cCI6MjA4NjUyMjMzMn0.ZEjuObyjsceVTWXaACcABbEgYHOYE9pew-Ye8YcgJLQ';
+let expenses = [];
+let supabase = null;
+let subscription = null;
+
+// --- Supabase ---
+async function connectSupabase(url, key) {
+  supabase = window.supabase.createClient(url, key);
+
+  // Test connection
+  const { error } = await supabase.from('expenses').select('id').limit(1);
+  if (error) throw error;
+
+  setStatus(true);
+
+  // Load all expenses
+  await loadExpenses();
+
+  // Subscribe to real-time changes
+  subscription = supabase
+    .channel('expenses-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => {
+      loadExpenses();
+    })
+    .subscribe();
+}
+
+async function loadExpenses() {
+  const { data, error } = await supabase
+    .from('expenses')
+    .select('*')
+    .order('expense_date', { ascending: true });
+
+  if (error) {
+    console.error('Load error:', error);
+    showToast('Error loading expenses');
+    return;
+  }
+
+  expenses = data.map(row => ({
+    id: row.id,
+    desc: row.description,
+    amount: parseFloat(row.amount),
+    payer: row.payer,
+    date: row.expense_date,
+    splitAmong: row.split_among
+  }));
+
+  render();
+}
+
+async function addExpense() {
+  const desc = document.getElementById('desc').value.trim();
+  const amount = parseFloat(document.getElementById('amount').value);
+  const payer = document.getElementById('payer').value;
+  const date = document.getElementById('date').value;
+  const splitAmong = PEOPLE.filter(p => document.getElementById('split-' + p).checked);
+
+  if (!desc) { showToast('Enter a description'); return; }
+  if (!amount || amount <= 0) { showToast('Enter a valid amount'); return; }
+  if (!date) { showToast('Pick a date'); return; }
+  if (splitAmong.length === 0) { showToast('Select at least one person'); return; }
+
+  const { error } = await supabase.from('expenses').insert({
+    description: desc,
+    amount: amount,
+    payer: payer,
+    expense_date: date,
+    split_among: splitAmong
+  });
+
+  if (error) {
+    console.error('Insert error:', error);
+    showToast('Error adding expense');
+    return;
+  }
+
+  document.getElementById('desc').value = '';
+  document.getElementById('amount').value = '';
+  PEOPLE.forEach(p => document.getElementById('split-' + p).checked = true);
+  showToast('Expense added');
+}
+
+async function deleteExpense(id) {
+  const { error } = await supabase.from('expenses').delete().eq('id', id);
+  if (error) {
+    console.error('Delete error:', error);
+    showToast('Error deleting expense');
+  }
+}
+
+// --- UI ---
+function setStatus(connected) {
+  document.getElementById('status-dot').className = 'status-dot ' + (connected ? 'connected' : 'disconnected');
+  document.getElementById('status-text').textContent = connected ? 'Live — synced with everyone' : 'Disconnected';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function formatMoney(n) {
+  return '$' + Math.abs(n).toFixed(2);
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  const parts = d.split('-');
+  return parts[1] + '/' + parts[2];
+}
+
+function render() {
+  renderExpenses();
+  renderSummary();
+  renderSettlement();
+}
+
+function renderExpenses() {
+  const el = document.getElementById('expense-list');
+  if (expenses.length === 0) {
+    el.innerHTML = '<div class="no-expenses">No expenses yet. Add your first one above.</div>';
+    return;
+  }
+
+  let total = 0;
+  let html = '<table><tr><th>Date</th><th>Description</th><th>Paid By</th><th>Split</th><th style="text-align:right">Amount</th><th></th></tr>';
+  for (const e of expenses) {
+    total += e.amount;
+    const splitTags = (e.splitAmong || PEOPLE).map(p => `<span class="split-tag">${p}</span>`).join('');
+    html += `<tr>
+      <td>${formatDate(e.date)}</td>
+      <td>${e.desc}</td>
+      <td>${e.payer}</td>
+      <td><div class="split-tags">${splitTags}</div></td>
+      <td class="amount-cell" style="text-align:right">${formatMoney(e.amount)}</td>
+      <td><button class="btn-delete" onclick="deleteExpense(${e.id})" title="Delete">&times;</button></td>
+    </tr>`;
+  }
+  html += `<tr class="total-row"><td></td><td>Total</td><td></td><td></td><td class="amount-cell" style="text-align:right">${formatMoney(total)}</td><td></td></tr>`;
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+function renderSummary() {
+  const el = document.getElementById('summary');
+  if (expenses.length === 0) {
+    el.innerHTML = '<div class="no-expenses">Add expenses to see the summary.</div>';
+    return;
+  }
+
+  const paid = {};
+  const owes = {};
+  PEOPLE.forEach(p => { paid[p] = 0; owes[p] = 0; });
+
+  for (const e of expenses) {
+    paid[e.payer] += e.amount;
+    const splitAmong = e.splitAmong || PEOPLE;
+    const share = e.amount / splitAmong.length;
+    splitAmong.forEach(p => { owes[p] += share; });
+  }
+
+  let html = '<div class="summary-grid">';
+  for (const p of PEOPLE) {
+    const balance = paid[p] - owes[p];
+    const cls = balance > 0.005 ? 'positive' : balance < -0.005 ? 'negative' : 'zero';
+    const sign = balance > 0.005 ? '+' : '';
+    html += `<div class="summary-person">
+      <div class="name">${p}</div>
+      <div class="paid">Paid: ${formatMoney(paid[p])}</div>
+      <div class="owed">Fair share: ${formatMoney(owes[p])}</div>
+      <div class="balance ${cls}">${sign}${balance >= 0 ? '' : '-'}${formatMoney(balance)}</div>
+    </div>`;
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function renderSettlement() {
+  const el = document.getElementById('settlement');
+  if (expenses.length === 0) {
+    el.innerHTML = '<div class="no-expenses">Add expenses to see settlements.</div>';
+    return;
+  }
+
+  const paid = {};
+  const owes = {};
+  PEOPLE.forEach(p => { paid[p] = 0; owes[p] = 0; });
+
+  for (const e of expenses) {
+    paid[e.payer] += e.amount;
+    const splitAmong = e.splitAmong || PEOPLE;
+    const share = e.amount / splitAmong.length;
+    splitAmong.forEach(p => { owes[p] += share; });
+  }
+
+  let balances = PEOPLE.map(p => ({ name: p, balance: parseFloat((paid[p] - owes[p]).toFixed(2)) }));
+
+  const transfers = [];
+  const debtors = balances.filter(b => b.balance < -0.005).map(b => ({ ...b }));
+  const creditors = balances.filter(b => b.balance > 0.005).map(b => ({ ...b }));
+
+  debtors.sort((a, b) => a.balance - b.balance);
+  creditors.sort((a, b) => b.balance - a.balance);
+
+  let i = 0, j = 0;
+  while (i < debtors.length && j < creditors.length) {
+    const amount = Math.min(-debtors[i].balance, creditors[j].balance);
+    if (amount > 0.005) {
+      transfers.push({ from: debtors[i].name, to: creditors[j].name, amount: parseFloat(amount.toFixed(2)) });
+    }
+    debtors[i].balance += amount;
+    creditors[j].balance -= amount;
+    if (Math.abs(debtors[i].balance) < 0.005) i++;
+    if (Math.abs(creditors[j].balance) < 0.005) j++;
+  }
+
+  if (transfers.length === 0) {
+    el.innerHTML = '<div class="no-expenses">Everyone is settled up!</div>';
+    return;
+  }
+
+  let html = '';
+  for (const t of transfers) {
+    html += `<div class="settlement-item">
+      <strong>${t.from}</strong>
+      <span class="arrow">pays &rarr;</span>
+      <strong>${t.to}</strong>
+      <span class="amount">${formatMoney(t.amount)}</span>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// --- Init ---
+async function init() {
+  document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+  try {
+    await connectSupabase(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } catch (err) {
+    console.error('Connection error:', err);
+    setStatus(false);
+    showToast('Connection failed');
+  }
+}
+
+init();
+</script>
+</body>
+</html>
