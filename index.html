@@ -352,16 +352,15 @@ const PEOPLE = ['Vince', 'Jim', 'Dave'];
 const SUPABASE_URL = 'https://btfwvsfbmiyezenzwnpa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0Znd2c2ZibWl5ZXplbnp3bnBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5NDYzMzIsImV4cCI6MjA4NjUyMjMzMn0.ZEjuObyjsceVTWXaACcABbEgYHOYE9pew-Ye8YcgJLQ';
 let expenses = [];
-let supabase = null;
+let db = null;
 let subscription = null;
 
 // --- Supabase ---
 async function connectSupabase(url, key) {
-  const { createClient } = window.supabase;
-  supabase = createClient(url, key);
+  db = window.supabase.createClient(url, key);
 
   // Test connection
-  const { error } = await supabase.from('expenses').select('id').limit(1);
+  const { error } = await db.from('expenses').select('id').limit(1);
   if (error) throw error;
 
   setStatus(true);
@@ -370,7 +369,7 @@ async function connectSupabase(url, key) {
   await loadExpenses();
 
   // Subscribe to real-time changes
-  subscription = supabase
+  subscription = db
     .channel('expenses-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => {
       loadExpenses();
@@ -379,7 +378,7 @@ async function connectSupabase(url, key) {
 }
 
 async function loadExpenses() {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('expenses')
     .select('*')
     .order('expense_date', { ascending: true });
@@ -414,7 +413,7 @@ async function addExpense() {
   if (!date) { showToast('Pick a date'); return; }
   if (splitAmong.length === 0) { showToast('Select at least one person'); return; }
 
-  const { error } = await supabase.from('expenses').insert({
+  const { error } = await db.from('expenses').insert({
     description: desc,
     amount: amount,
     payer: payer,
@@ -435,7 +434,7 @@ async function addExpense() {
 }
 
 async function deleteExpense(id) {
-  const { error } = await supabase.from('expenses').delete().eq('id', id);
+  const { error } = await db.from('expenses').delete().eq('id', id);
   if (error) {
     console.error('Delete error:', error);
     showToast('Error deleting expense');
