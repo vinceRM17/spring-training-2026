@@ -337,9 +337,49 @@
     <div id="summary"></div>
   </div>
 
+  <!-- Record Payment -->
+  <div class="card">
+    <h2>Record Payment</h2>
+    <div class="form-row">
+      <div class="form-group payer">
+        <label>From</label>
+        <select id="pay-from">
+          <option value="Vince">Vince</option>
+          <option value="Jim">Jim</option>
+          <option value="Dave">Dave</option>
+        </select>
+      </div>
+      <div class="form-group payer">
+        <label>To</label>
+        <select id="pay-to">
+          <option value="Vince">Vince</option>
+          <option value="Jim" selected>Jim</option>
+          <option value="Dave">Dave</option>
+        </select>
+      </div>
+      <div class="form-group amount">
+        <label>Amount ($)</label>
+        <input type="number" id="pay-amount" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="form-group date">
+        <label>Date</label>
+        <input type="date" id="pay-date">
+      </div>
+    </div>
+    <div style="margin-top: 14px;">
+      <button class="btn btn-add" onclick="addPayment()">Record Payment</button>
+    </div>
+  </div>
+
+  <!-- Payments List -->
+  <div class="card">
+    <h2>Payments</h2>
+    <div id="payment-list"></div>
+  </div>
+
   <!-- Settlement -->
   <div class="card settlement-card">
-    <h2>Who Owes Whom</h2>
+    <h2>Who Still Owes Whom</h2>
     <div id="settlement"></div>
   </div>
 
@@ -352,8 +392,10 @@ const PEOPLE = ['Vince', 'Jim', 'Dave'];
 const SUPABASE_URL = 'https://btfwvsfbmiyezenzwnpa.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0Znd2c2ZibWl5ZXplbnp3bnBhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5NDYzMzIsImV4cCI6MjA4NjUyMjMzMn0.ZEjuObyjsceVTWXaACcABbEgYHOYE9pew-Ye8YcgJLQ';
 let expenses = [];
+let payments = [];
 let db = null;
 let subscription = null;
+let paymentSubscription = null;
 
 // --- Supabase ---
 async function connectSupabase(url, key) {
@@ -365,14 +407,18 @@ async function connectSupabase(url, key) {
 
   setStatus(true);
 
-  // Load all expenses
+  // Load all data
   await loadExpenses();
+  await loadPayments();
 
   // Subscribe to real-time changes
   subscription = db
-    .channel('expenses-changes')
+    .channel('all-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => {
       loadExpenses();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
+      loadPayments();
     })
     .subscribe();
 }
@@ -441,6 +487,64 @@ async function deleteExpense(id) {
   }
 }
 
+// --- Payments ---
+async function loadPayments() {
+  const { data, error } = await db
+    .from('payments')
+    .select('*')
+    .order('payment_date', { ascending: true });
+
+  if (error) {
+    console.error('Load payments error:', error);
+    return;
+  }
+
+  payments = data.map(row => ({
+    id: row.id,
+    from: row.from_person,
+    to: row.to_person,
+    amount: parseFloat(row.amount),
+    date: row.payment_date
+  }));
+
+  render();
+}
+
+async function addPayment() {
+  const from = document.getElementById('pay-from').value;
+  const to = document.getElementById('pay-to').value;
+  const amount = parseFloat(document.getElementById('pay-amount').value);
+  const date = document.getElementById('pay-date').value;
+
+  if (from === to) { showToast('From and To must be different'); return; }
+  if (!amount || amount <= 0) { showToast('Enter a valid amount'); return; }
+  if (!date) { showToast('Pick a date'); return; }
+
+  const { error } = await db.from('payments').insert({
+    from_person: from,
+    to_person: to,
+    amount: amount,
+    payment_date: date
+  });
+
+  if (error) {
+    console.error('Insert payment error:', error);
+    showToast('Error recording payment');
+    return;
+  }
+
+  document.getElementById('pay-amount').value = '';
+  showToast('Payment recorded');
+}
+
+async function deletePayment(id) {
+  const { error } = await db.from('payments').delete().eq('id', id);
+  if (error) {
+    console.error('Delete payment error:', error);
+    showToast('Error deleting payment');
+  }
+}
+
 // --- UI ---
 function setStatus(connected) {
   document.getElementById('status-dot').className = 'status-dot ' + (connected ? 'connected' : 'disconnected');
@@ -466,8 +570,31 @@ function formatDate(d) {
 
 function render() {
   renderExpenses();
+  renderPayments();
   renderSummary();
   renderSettlement();
+}
+
+function renderPayments() {
+  const el = document.getElementById('payment-list');
+  if (payments.length === 0) {
+    el.innerHTML = '<div class="no-expenses">No payments recorded yet.</div>';
+    return;
+  }
+
+  let html = '<table><tr><th>Date</th><th>From</th><th></th><th>To</th><th style="text-align:right">Amount</th><th></th></tr>';
+  for (const p of payments) {
+    html += `<tr>
+      <td>${formatDate(p.date)}</td>
+      <td>${p.from}</td>
+      <td style="color:#FD5A1E;">&rarr;</td>
+      <td>${p.to}</td>
+      <td class="amount-cell" style="text-align:right">${formatMoney(p.amount)}</td>
+      <td><button class="btn-delete" onclick="deletePayment(${p.id})" title="Delete">&times;</button></td>
+    </tr>`;
+  }
+  html += '</table>';
+  el.innerHTML = html;
 }
 
 function renderExpenses() {
@@ -496,13 +623,7 @@ function renderExpenses() {
   el.innerHTML = html;
 }
 
-function renderSummary() {
-  const el = document.getElementById('summary');
-  if (expenses.length === 0) {
-    el.innerHTML = '<div class="no-expenses">Add expenses to see the summary.</div>';
-    return;
-  }
-
+function getBalances() {
   const paid = {};
   const owes = {};
   PEOPLE.forEach(p => { paid[p] = 0; owes[p] = 0; });
@@ -513,6 +634,24 @@ function renderSummary() {
     const share = e.amount / splitAmong.length;
     splitAmong.forEach(p => { owes[p] += share; });
   }
+
+  // Adjust for payments made between people
+  for (const p of payments) {
+    paid[p.from] += p.amount;
+    owes[p.to] += p.amount;
+  }
+
+  return { paid, owes };
+}
+
+function renderSummary() {
+  const el = document.getElementById('summary');
+  if (expenses.length === 0) {
+    el.innerHTML = '<div class="no-expenses">Add expenses to see the summary.</div>';
+    return;
+  }
+
+  const { paid, owes } = getBalances();
 
   let html = '<div class="summary-grid">';
   for (const p of PEOPLE) {
@@ -537,16 +676,7 @@ function renderSettlement() {
     return;
   }
 
-  const paid = {};
-  const owes = {};
-  PEOPLE.forEach(p => { paid[p] = 0; owes[p] = 0; });
-
-  for (const e of expenses) {
-    paid[e.payer] += e.amount;
-    const splitAmong = e.splitAmong || PEOPLE;
-    const share = e.amount / splitAmong.length;
-    splitAmong.forEach(p => { owes[p] += share; });
-  }
+  const { paid, owes } = getBalances();
 
   let balances = PEOPLE.map(p => ({ name: p, balance: parseFloat((paid[p] - owes[p]).toFixed(2)) }));
 
@@ -588,7 +718,9 @@ function renderSettlement() {
 
 // --- Init ---
 async function init() {
-  document.getElementById('date').value = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('date').value = today;
+  document.getElementById('pay-date').value = today;
 
   try {
     await connectSupabase(SUPABASE_URL, SUPABASE_ANON_KEY);
