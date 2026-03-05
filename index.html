@@ -651,6 +651,18 @@ function renderSummary() {
     return;
   }
 
+  // Expense-only totals for display
+  const expPaid = {};
+  const expOwes = {};
+  PEOPLE.forEach(p => { expPaid[p] = 0; expOwes[p] = 0; });
+  for (const e of expenses) {
+    expPaid[e.payer] += e.amount;
+    const splitAmong = e.splitAmong || PEOPLE;
+    const share = e.amount / splitAmong.length;
+    splitAmong.forEach(p => { expOwes[p] += share; });
+  }
+
+  // Full balances including payments
   const { paid, owes } = getBalances();
 
   let html = '<div class="summary-grid">';
@@ -660,8 +672,8 @@ function renderSummary() {
     const sign = balance > 0.005 ? '+' : '';
     html += `<div class="summary-person">
       <div class="name">${p}</div>
-      <div class="paid">Paid: ${formatMoney(paid[p])}</div>
-      <div class="owed">Fair share: ${formatMoney(owes[p])}</div>
+      <div class="paid">Paid for group: ${formatMoney(expPaid[p])}</div>
+      <div class="owed">Fair share: ${formatMoney(expOwes[p])}</div>
       <div class="balance ${cls}">${sign}${balance >= 0 ? '' : '-'}${formatMoney(balance)}</div>
     </div>`;
   }
